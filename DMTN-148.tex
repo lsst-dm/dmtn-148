@@ -16,7 +16,7 @@
 % \setDocSubtitle{A subtitle}
 
 \author{%
-Chris Waters
+Christopher Z Waters
 }
 
 \setDocRef{DMTN-148}
@@ -50,9 +50,240 @@ The goal of this tech note is to provide a plan for the handling of calibration 
 % ADD CONTENT HERE
 % You can also use the \input command to include several content files.
 
+\section{Intro}
+
+The goal of this tech note is to provide a plan for the handling of
+calibration products in the Gen-3 Butler environment.  There are a
+large number of these products currently in use, but many of them do
+not have a clearly defined process to define, ingest, test, and
+deprecate them.  The lack of documentation on how these processes work
+has led to many implementations of similar paths, further complicating
+the issue.
+
+Throughout this document, names in all caps (BIAS) represent a
+specific type of calibration products.  The acronym OIDF stands for
+the set of (\verb|OBSTYPE|, \verb|INSTRUME|, \verb|DETECTOR|,
+\verb|FILTER|) dataId values.
+
+\section{The End State}
+
+The final state that we wish to get to has the following properties:
+
+\begin{itemize}
+\item All calibration products are either lsst.afw.image.Exposure
+  image data or an explicit calibration class in the ip_isr package.
+\item All calibration products are constructed from a DM Task in the
+  cp_pipe package, and have the input data and configuration
+  parameters persisted with the calibration itself.  This guarantees
+  that any product can be reconstructed in the future.
+\item These provenance, config, and final product files may be saved
+  to an obs_x_data package on git for convenience.  This also allows
+  these files to be migrated to other Butler repositories in a
+  consistent fashion.
+\item All calibration products are accepted for use and have a date
+  range set manually, preventing test runs from being used
+  inadvertantly.  Calibrations ingested from git should supply
+  appropriate date ranges.
+\item Calibration information stored in a lsst.afw.cameraGeom object
+  may be used, but is always assumed to be overriden by supplied
+  calibration products.  No new calibration information should be
+  stored in these objects, and currently existing calibration
+  information should be deprecated.
+
+\end{itemize}
+
+\section{The Current State}
+
+\subsection{Standard Calibrations}
+
+The classic calibration products, BIAS, DARK, FLAT, and FRINGE, all
+write FITS files that are indexed in Butler's calibRegistry.sqlite3
+repository database.  These files are created by
+pipe_drivers/constructCalibs.py, and are ingested into the
+repository upon acceptance by pipe_tasks/ingestCalibs.py.  This
+ingestion process sets the 'validStart' and 'validEnd' values to
+restrict the usage of the calibration, as well as the 'calibDate',
+which is used (along with calibration type, filter, and detector) to
+uniquely identify the calibration on disk.
+
+Although not formally a "classic" calibration product, the SKY
+calibration is produced, stored, and accessed the same way.
+
+These calibrations are required to have the following header keywords
+defined, which are used during ingest to define the rows of the
+appropriate calibration database table.  \draftnote{This is not formally true.  I believe only OBSTYPE is required right now.}
+
+\begin{tabular}{l l}
+  Keyword & Description \\
+  \hline
+  \verb|OBSTYPE| & Calibration type contained in this file. \\
+  \verb|INSTRUME| & Instrument/camera this calibration belongs to. \\
+  \verb|DETECTOR| & Integer identifier for the ccd/detector. \\
+  \verb|FILTER| & Name of the physical filter or ``NONE''. \\
+  \verb|CALIB_CREATION_DATE| & Creation date of the calibration. \\
+  \verb|CALIB_CREATION_TIME| & Creation time of the calibration. \\
+  \verb|CALIBDATE| & Concatenation of \verb|CALIB_CREATION_DATE| and \verb|CALIB_CREATION_TIME| \draftnote{ISSUE!}  Unique for set of OIDF.\\
+  \verb|DATE| & Usage start datetime of the product (see validStart). \draftnote{ISSUE!} \\
+  \verb|CALIB_ID| & DataId that can be used to request this calibration after ingest. \\
+\end{tabular}
+
+\subsection{``User-curated'' Calibrations}
+
+The other inputs necessary for ISR have generally been described as
+"user-curated".  These products are either defined by the CAMERA as
+part of the afw.cameraGeom description of the instrument, or are
+variously persisted and accessed in unique ways.  Describing a path to
+fixing this is a goal of this tech note.
+
+As part of the DEFECTS rework (RFC-595), there is now a fixed and
+generic way to handle the ingest, if not necessarily the construction,
+of that product.  The QE_CURVE (RFC-625) has been implemented
+following this process.  These DEFECTS-like calibration products have
+their origins as human-curated text files in the appropriate
+obs_CAMERA_data packages (and are thereby versioned through the
+packages' git repositories).  The text file must be in a structured
+format, to allow the header keywords to be read and assigned to a
+metadata PropertyList.
+
+For these products to be used, they must be converted into a FITS
+format that can be read by ingestCalibs.py.  This is performed by the
+pipe_tasks/ingestCuratedCalibs.py script, which uses the metadata
+information and the calibration product's python class to read the
+text version and convert to a FITS file format that can be ingested by
+ingestCalibs.py.
+
+This updated calibration process removes the necessity that each
+obs_CAMERA_data package implement one-off mapper methods to allow the
+product to be found.  However, only DEFECTS, QE_CURVE, and LINEARITY
+follow this system, leaving the remaining products to be handled with
+camera-specific code and cameraGeom entries.  In addition to having
+diverse implementations, these handlers are often rigid, and cannot be
+versioned easily.
+
+\section{Transitioning to Gen3/What We Should Expect From Gen3}
+
+\subsection{A CalibrationBaseClass}
+The first step to a consistent calibration system is to ensure that
+all products in both generations use the DEFECTS-like calibration
+product system.  For FITS image products, this requires future
+calibrations to be constructed with all of the header keyword values
+listed above.
+
+The remaining unconverted calibration types (CROSSTALK, BFKERNEL)
+should be converted to use DEFECTS-like class, most likely by defining
+a CalibrationBaseClass, and making all of the calibration products
+subclasses of that.  This would enforce that all calibrations can be
+relied upon to provide getMetadata, setMetadata, readFits, writeFits,
+readText, and writeText methods.  Gen2 Butler instances would then be
+able to access all calibration products in a single consistent manner.
+This also ensures that Gen2 and Gen3 can use the same calibration
+products.
+
+\subsection{Calibration Construction in Gen3}
+
+Calibration products should be constructed using well defined
+PipelineTask code.  This removes the need to delineate between
+``calibrations'' and ``user-curated calibrations''.  The only
+remaining difference between these two groups is what the initial
+persisted data type is: ``calibrations'' are stored in FITS images, as
+they represent corrections that are only meaningful as full images;
+``user-curated calibrations'' can be visualized in a small number of
+parameters, and so persisting these in a text format to allow user
+inspection is reasonable.  ECSV and YAML are good formats for these
+calibrations, and a calibration's readText/writeText methods should
+implement one of these.
+
+In addition to the calibration product, the PipelineTask code must
+persist a record of the input data used for construction.  This, along
+with the already persisted pipeline definition and task configuration,
+allows the calibration to be regenerated by any user, making the
+construction process much more transparent than it currently is.  A
+YAML file containing the dataId parameters for all inputs would
+satisfy this.  Appending additional construction statistics (for
+example, weight factors applied to each input during the combination
+stage) would be helpful in the validation process.
+
+Newly generated calibration products will belong to a Gen3 collection,
+and that collection will be used to manage the calibration through the
+validation and certification process.  This collection may only
+contain one entry for a given OIDF set.
+
+\subsection{Validation}
+
+Calibration products are not currently validated, largely due to the
+opaque construction process.  Some set of proper validation tasks must
+be made, applying the newly constructed product to a set of test
+exposures prior to that calibration product's certification.  Applying
+these validation tasks continuously as new data is taken will inform
+the date ranges for which the product is certified.
+
+\subsection{Certification}
+
+Once a calibration product has been confirmed through validation to
+correct the instrument effect it is designed for, it will be certified
+with a date range denoting when the calibration is valid, and assigned
+to a particular calibration collection (which may contain calibrations
+the same OIDF values, as the validity range adds another dimension).
+For FITS image calibrations, this is equivalent to a database
+operation; no persisted data need change.  This is also acceptable for
+text calibrations, although conversion to FITS (using the
+CalibrationBaseClass methods) may be desired for IO speed. In
+addition, as the text calibrations are human readable and easier to
+manage, they should be exported to the appropriate obs_CAMERA_data
+package.  This provides a common versioned repository for the state of
+the camera calibration that can be exported and used independently of
+the Gen3 repository where they were constructed.  These exports should
+also include the configuration and input data records.
+
+\subsection{Modifying Calibrations}
+
+Most calibration products need user intervention only to launch the
+construction and to validate and certify the result.  However, it is
+assumed that some of the products used (such as CAMERA and QE_CURVE
+definitions) will not have a PipelineTask construction process.  The
+version of these products stored in the obs_CAMERA_data (or obs_CAMERA
+for the case of the CAMERA calibration) repository will be ingested
+into the Butler repository as needed.  These products should still
+have as much configuration and provenance data as is possible, but
+should also note any manual edits with a name and date.  This
+provenance method should also be used for calibrations that need to be
+augmented in non-algorithmic ways, such as DEFECTS.
+
+\subsection{Deprecating Calibrations}
+
+Calibrations that should no longer be used (due to code improvements
+or newly discovered problems) can be deprecated in Gen3 with
+operations on the calibration collection that contains them.  This
+will require tools for collection management, but this will be
+entirely Butler database operations and will likely not be calibration
+specific.
+
+\section{Conclusion}
+
+
+
 \appendix
 % Include all the relevant bib files.
 % https://lsst-texmf.lsst.io/lsstdoc.html#bibliographies
+
+\begin{tabular}{l |c|c|l|l}
+  Calibration product & Gen-2 Form & Gen-3 Form & Notes \\
+  \hline
+  BIAS & FITS & FITS & Content should be a afw.image.ExposureF \\
+  DARK & FITS & FITS & Content should be a afw.image.ExposureF \\
+  FLAT & FITS & FITS & Content should be a afw.image.ExposureF \\
+  FRINGE & FITS & FITS & Content should be a afw.image.ExposureF \\
+  SKY & FITS & FITS & Content should be a afw.image.ExposureF \\
+  CAMERA & FITS & yamlCamera & Defined by afw.cameraGeom.\\
+  DEFECTS & meas_algorithms.defects.Defects & meas_algorithms.Defects & Ensure consistent keyword values. \\
+  CROSSTALK & afw.cameraGeom & ip_isr.Crosstalk & TBD \\
+  LINEARITY & afw.cameraGeom & ip_isr.Linearizer & In progress \\
+  BFKERNEL & & & \\
+  QE_CURVE & meas_algorithms.Curve & meas_algorithms.Curve & \\
+  STRAYLIGHT & FITS & FITS & \\
+  ILLUMINATION & FITS & FITS & \\
+\end{tabular}
+
 \section{References} \label{sec:bib}
 \bibliography{local,lsst,lsst-dm,refs_ads,refs,books}
 
