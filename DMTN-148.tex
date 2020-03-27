@@ -60,10 +60,6 @@ deprecate them.  The lack of documentation on how these processes work
 has led to many implementations of similar paths, further complicating
 the issue.
 
-Throughout this document, names in all caps (BIAS) represent a
-specific type of calibration products.  The acronym OIDF stands for
-the set of (\verb|OBSTYPE|, \verb|INSTRUME|, \verb|DETECTOR|,
-\verb|FILTER|) dataId values.
 
 \section{The End State}
 
@@ -71,21 +67,21 @@ The final state that we wish to get to has the following properties:
 
 \begin{itemize}
 \item All calibration products are either lsst.afw.image.Exposure
-  image data or an explicit calibration class in the ip_isr package.
+  image data or an explicit calibration class in the \verb|ip_isr| package.
 \item All calibration products are constructed from a DM Task in the
-  cp_pipe package, and have the input data and configuration
+  \verb|cp_pipe| package, and have the input data and configuration
   parameters persisted with the calibration itself.  This guarantees
   that any product can be reconstructed in the future.
 \item These provenance, config, and final product files may be saved
-  to an obs_x_data package on git for convenience.  This also allows
+  to an \verb|obs_CAMERA_data| package on git for convenience.  This also allows
   these files to be migrated to other Butler repositories in a
   consistent fashion.
 \item All calibration products are accepted for use and have a date
   range set manually, preventing test runs from being used
-  inadvertantly.  Calibrations ingested from git should supply
+  inadvertently.  Calibrations ingested from git should supply
   appropriate date ranges.
 \item Calibration information stored in a lsst.afw.cameraGeom object
-  may be used, but is always assumed to be overriden by supplied
+  may be used, but is always assumed to be overridden by supplied
   calibration products.  No new calibration information should be
   stored in these objects, and currently existing calibration
   information should be deprecated.
@@ -96,22 +92,23 @@ The final state that we wish to get to has the following properties:
 
 \subsection{Standard Calibrations}
 
-The classic calibration products, BIAS, DARK, FLAT, and FRINGE, all
+The classic calibration products, \verb|BIAS|, \verb|DARK|, \verb|FLAT|, and \verb|FRINGE|, all
 write FITS files that are indexed in Butler's calibRegistry.sqlite3
 repository database.  These files are created by
-pipe_drivers/constructCalibs.py, and are ingested into the
-repository upon acceptance by pipe_tasks/ingestCalibs.py.  This
+\verb|pipe_drivers|/constructCalibs.py, and are ingested into the
+repository upon acceptance by \verb|pipe_tasks|/ingestCalibs.py.  This
 ingestion process sets the 'validStart' and 'validEnd' values to
 restrict the usage of the calibration, as well as the 'calibDate',
 which is used (along with calibration type, filter, and detector) to
 uniquely identify the calibration on disk.
 
-Although not formally a "classic" calibration product, the SKY
+Although not formally a "classic" calibration product, the \verb|SKY|
 calibration is produced, stored, and accessed the same way.
 
 These calibrations are required to have the following header keywords
 defined, which are used during ingest to define the rows of the
-appropriate calibration database table.  \draftnote{This is not formally true.  I believe only OBSTYPE is required right now.}
+appropriate calibration database table.  I believe only \verb|OBSTYPE|
+is required right now.
 
 \begin{tabular}{l l}
   Keyword & Description \\
@@ -122,39 +119,39 @@ appropriate calibration database table.  \draftnote{This is not formally true.  
   \verb|FILTER| & Name of the physical filter or ``NONE''. \\
   \verb|CALIB_CREATION_DATE| & Creation date of the calibration. \\
   \verb|CALIB_CREATION_TIME| & Creation time of the calibration. \\
-  \verb|CALIBDATE| & Concatenation of \verb|CALIB_CREATION_DATE| and \verb|CALIB_CREATION_TIME| \draftnote{ISSUE!}  Unique for set of OIDF.\\
-  \verb|DATE| & Usage start datetime of the product (see validStart). \draftnote{ISSUE!} \\
+  \verb|CALIBDATE| & Concatenation of \verb|CALIB_CREATION_DATE| and \verb|CALIB_CREATION_TIME|.  Unique for set of OIDF.\\
+  \verb|DATE| & Usage start datetime of the product (see validStart).  \\
   \verb|CALIB_ID| & DataId that can be used to request this calibration after ingest. \\
 \end{tabular}
 
 \subsection{``User-curated'' Calibrations}
 
 The other inputs necessary for ISR have generally been described as
-"user-curated".  These products are either defined by the CAMERA as
+"user-curated".  These products are either defined by the \verb|CAMERA| as
 part of the afw.cameraGeom description of the instrument, or are
 variously persisted and accessed in unique ways.  Describing a path to
 fixing this is a goal of this tech note.
 
-As part of the DEFECTS rework (RFC-595), there is now a fixed and
+As part of the \verb|DEFECTS| rework (RFC-595), there is now a fixed and
 generic way to handle the ingest, if not necessarily the construction,
-of that product.  The QE_CURVE (RFC-625) has been implemented
-following this process.  These DEFECTS-like calibration products have
+of that product.  The \verb|QE_CURVE| (RFC-625) has been implemented
+following this process.  These \verb|DEFECTS|-like calibration products have
 their origins as human-curated text files in the appropriate
-obs_CAMERA_data packages (and are thereby versioned through the
+\verb|obs_CAMERA_data| packages (and are thereby versioned through the
 packages' git repositories).  The text file must be in a structured
 format, to allow the header keywords to be read and assigned to a
 metadata PropertyList.
 
 For these products to be used, they must be converted into a FITS
 format that can be read by ingestCalibs.py.  This is performed by the
-pipe_tasks/ingestCuratedCalibs.py script, which uses the metadata
+\verb|pipe_tasks|/ingestCuratedCalibs.py script, which uses the metadata
 information and the calibration product's python class to read the
 text version and convert to a FITS file format that can be ingested by
 ingestCalibs.py.
 
 This updated calibration process removes the necessity that each
-obs_CAMERA_data package implement one-off mapper methods to allow the
-product to be found.  However, only DEFECTS, QE_CURVE, and LINEARITY
+\verb|obs_CAMERA_data| package implement one-off mapper methods to allow the
+product to be found.  However, only \verb|DEFECTS|, \verb|QE_CURVE|, and \verb|LINEARITY|
 follow this system, leaving the remaining products to be handled with
 camera-specific code and cameraGeom entries.  In addition to having
 diverse implementations, these handlers are often rigid, and cannot be
@@ -164,13 +161,13 @@ versioned easily.
 
 \subsection{A CalibrationBaseClass}
 The first step to a consistent calibration system is to ensure that
-all products in both generations use the DEFECTS-like calibration
+all products in both generations use the \verb|DEFECTS|-like calibration
 product system.  For FITS image products, this requires future
 calibrations to be constructed with all of the header keyword values
 listed above.
 
-The remaining unconverted calibration types (CROSSTALK, BFKERNEL)
-should be converted to use DEFECTS-like class, most likely by defining
+The remaining unconverted calibration types (\verb|CROSSTALK|, \verb|BFKERNEL|)
+should be converted to use \verb|DEFECTS|-like class, most likely by defining
 a CalibrationBaseClass, and making all of the calibration products
 subclasses of that.  This would enforce that all calibrations can be
 relied upon to provide getMetadata, setMetadata, readFits, writeFits,
@@ -229,7 +226,7 @@ operation; no persisted data need change.  This is also acceptable for
 text calibrations, although conversion to FITS (using the
 CalibrationBaseClass methods) may be desired for IO speed. In
 addition, as the text calibrations are human readable and easier to
-manage, they should be exported to the appropriate obs_CAMERA_data
+manage, they should be exported to the appropriate \verb|obs_CAMERA_data|
 package.  This provides a common versioned repository for the state of
 the camera calibration that can be exported and used independently of
 the Gen3 repository where they were constructed.  These exports should
@@ -239,15 +236,15 @@ also include the configuration and input data records.
 
 Most calibration products need user intervention only to launch the
 construction and to validate and certify the result.  However, it is
-assumed that some of the products used (such as CAMERA and QE_CURVE
+assumed that some of the products used (such as \verb|CAMERA| and \verb|QE_CURVE|
 definitions) will not have a PipelineTask construction process.  The
-version of these products stored in the obs_CAMERA_data (or obs_CAMERA
-for the case of the CAMERA calibration) repository will be ingested
+version of these products stored in the \verb|obs_CAMERA_data| (or \verb|obs_CAMERA|
+for the case of the \verb|CAMERA| calibration) repository will be ingested
 into the Butler repository as needed.  These products should still
 have as much configuration and provenance data as is possible, but
 should also note any manual edits with a name and date.  This
 provenance method should also be used for calibrations that need to be
-augmented in non-algorithmic ways, such as DEFECTS.
+augmented in non-algorithmic ways, such as \verb|DEFECTS|.
 
 \subsection{Deprecating Calibrations}
 
@@ -269,19 +266,19 @@ specific.
 \begin{tabular}{l |c|c|l|l}
   Calibration product & Gen-2 Form & Gen-3 Form & Notes \\
   \hline
-  BIAS & FITS & FITS & Content should be a afw.image.ExposureF \\
-  DARK & FITS & FITS & Content should be a afw.image.ExposureF \\
-  FLAT & FITS & FITS & Content should be a afw.image.ExposureF \\
-  FRINGE & FITS & FITS & Content should be a afw.image.ExposureF \\
-  SKY & FITS & FITS & Content should be a afw.image.ExposureF \\
-  CAMERA & FITS & yamlCamera & Defined by afw.cameraGeom.\\
-  DEFECTS & meas_algorithms.defects.Defects & meas_algorithms.Defects & Ensure consistent keyword values. \\
-  CROSSTALK & afw.cameraGeom & ip_isr.Crosstalk & TBD \\
-  LINEARITY & afw.cameraGeom & ip_isr.Linearizer & In progress \\
-  BFKERNEL & & & \\
-  QE_CURVE & meas_algorithms.Curve & meas_algorithms.Curve & \\
-  STRAYLIGHT & FITS & FITS & \\
-  ILLUMINATION & FITS & FITS & \\
+  \verb|BIAS| & & & \\
+  \verb|DARK| & & & \\
+  \verb|FLAT| & & & \\
+  \verb|FRINGE| & & & \\
+  \verb|SKY| & & & \\
+  \verb|CAMERA| & & & \\
+  \verb|DEFECTS| & & & \\
+  \verb|CROSSTALK| & & & \\
+  \verb|LINEARITY| & & & \\
+  \verb|BFKERNE|L & & & \\
+  \verb|QE_CURVE| & & & \\
+  \verb|STRAYLIGHT| & & & \\
+  \verb|ILLUMINATION| & & & \\
 \end{tabular}
 
 \section{References} \label{sec:bib}
