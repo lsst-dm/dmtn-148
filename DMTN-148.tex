@@ -159,7 +159,7 @@ The first step to a consistent calibration system is to ensure that
 all products in both generations use the \verb|DEFECTS|-like calibration
 product system.  For FITS image products, this requires future
 calibrations to be constructed with all of the header keyword values
-listed above.
+listed in table \ref{tab:metadata}.
 
 The remaining unconverted calibration types (\verb|CROSSTALK|, \verb|BFKERNEL|)
 should be converted to use \verb|DEFECTS|-like class, most likely by defining
@@ -237,7 +237,8 @@ stage) would be helpful in the validation process.
 Newly generated calibration products will belong to a Gen3 collection,
 and that collection will be used to manage the calibration through the
 validation and certification process.  This collection may only
-contain one entry for a given OIDF set.
+contain one entry for a given Obstype, Instrument, Detector, Filter
+(OIDF) set.
 
 \subsection{Validation}
 
@@ -246,7 +247,9 @@ opaque construction process.  Some set of proper validation tasks must
 be made, applying the newly constructed product to a set of test
 exposures prior to that calibration product's certification.  Applying
 these validation tasks continuously as new data is taken will inform
-the date ranges for which the product is certified.
+the date ranges for which the product is certified.  LVV-57
+\citedsp{LVV-57} lists the requirements that the validation process
+will need to achieve when implemented.
 
 \subsection{Certification}
 
