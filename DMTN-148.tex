@@ -36,7 +36,8 @@ The goal of this tech note is to provide a plan for the handling of calibration 
 % Fields: VERSION, DATE, DESCRIPTION, OWNER NAME.
 % See LPM-51 for version number policy.
 \setDocChangeRecord{%
-  \addtohist{1}{YYYY-MM-DD}{Unreleased.}{Chris Waters}
+  \addtohist{1}{2020-04-16}{Initial version.}{Christopher Waters}
+  \addtohist{2}{2020-12-31}{Updates to represent how calibrations were actually made.}{Christopher Waters}
 }
 
 
@@ -67,26 +68,42 @@ The final state that we wish to get to has the following properties:
 
 \begin{itemize}
 \item All calibration products are either lsst.afw.image.Exposure
-  image data or an explicit calibration class in the \verb|ip_isr|
-  package.\footnote{This will require class reorganization to migrate
-    the Defects and Curve calibrations definitions.}
-\item All calibration products should be constructed from a DM Task in
-  the \verb|cp_pipe| package, and have the input data and
-  configuration parameters persisted with the calibration itself.
-  This guarantees that any product can be reconstructed in the future.
-  Exceptions will exist for external or lab created calibrations,
-  although the majority of used calibrations will likely be produced
-  directly.
-\item These provenance, config, and final product files may be saved
-  to an \verb|obs_CAMERA_data| package in git for convenience.  This
-  also allows these files to be migrated to other Butler repositories
-  in a consistent fashion.  Making these products human readable
-  allows the tracking of value changes with the evolution of the set
-  of exported products.
-\item All calibration products are accepted for use and have a date
-  range set manually, preventing test runs from being used
-  inadvertently.  Calibrations ingested from git should have sufficient
-  metadata that supply appropriate date ranges.
+  image data or a subclass of the \verb|CalibType| calibration class
+  from the \verb|ip_isr| package.
+%% CZW: input data => raw images.
+%%      single vs multiple pipelines.
+%%      provenance as a butler exportable object.
+\item As much as possible, all calibration products should be
+  constructed by a DM Task in the \verb|cp_pipe| package.  The raw
+  input data used for the construction will be available from the
+  Gen-3 Butler, and can be exported along with the task configuration
+  parameters to allow these calibrations to be reconstructed in the
+  future.  Exceptions will exist for external or lab created
+  calibrations, although we expect the number of these calibrations to
+  be small.
+\item The provenance, config, and final product files may be saved to
+  an \verb|obs_CAMERA_data| package in git for convenience.  This
+  allows these files to be directly migrated to other Butler
+  repositories without being reconstructed.  Making these products
+  human readable allows the tracking of value changes with the
+  evolution of the set of exported products.
+%% CZW: Prior calibrations used for live raw data.
+%%      cp_verify to show that live calibrations are consistent with that.
+\item All calibration products will be verified prior to
+  certification.  The goal of this process is to demonstrate that the
+  newly constructed calibration satisfies a number of quantifiable
+  quality checks.  This should reduce the amount of manual image
+  examination necessary for certification.  DMTN-101 will define the
+  exact tests for each calibration type.
+\item All calibration products are certified for use and have the
+  valid date range set manually, preventing test runs from being used
+  inadvertently.  Calibrations ingested from an \verb|obs_CAMERA_data|
+  package in git should have sufficient metadata that supply
+  appropriate date ranges.
+\item The verification pipeline will also be run on new raw
+  calibration data.  This will ensure that the certified calibrations
+  being used for the live raw data stream are appropriate, and to
+  monitor the variations of the defined metrics with time.
 \item Calibration information stored in a lsst.afw.cameraGeom object
   may be used, but is always assumed to be overridden by supplied
   calibration products.  No new calibration information should be
@@ -99,6 +116,8 @@ The final state that we wish to get to has the following properties:
 
 \subsection{Standard Calibrations}
 
+
+%% CZW: collection namning consistent with RFC-741/DMTN-167
 The classic calibration products, \verb|BIAS|, \verb|DARK|,
 \verb|FLAT|, and \verb|FRINGE|, all write FITS files that are indexed
 in Butler's calibRegistry.sqlite3 repository database.  These files
@@ -154,13 +173,36 @@ versioned easily.
 
 \section{Transitioning to Gen3/What We Should Expect From Gen3}
 
+\subsection{Figures}
+
+\begin{figure}
+  \caption{Standard calibration creation.}
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/Standard_Calibration.pdf}
+\end{figure}
+
+\begin{figure}
+  \caption{Hand-Edited calibration creation.}
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/Hand-Edited_Calibration.pdf}
+\end{figure}
+
+\begin{figure}
+  \caption{External calibration ingest.}
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/External_Calibration.pdf}
+\end{figure}
+
+
 \subsection{A CalibrationBaseClass}
 The first step to a consistent calibration system is to ensure that
 all products in both generations use the \verb|DEFECTS|-like calibration
 product system.  For FITS image products, this requires future
 calibrations to be constructed with all of the header keyword values
-listed above.
+listed below.
 
+%% CZW: discuss file format.
+%%      FITS as the default format, existing formatter.
 The remaining unconverted calibration types (\verb|CROSSTALK|, \verb|BFKERNEL|)
 should be converted to use \verb|DEFECTS|-like class, most likely by defining
 a CalibrationBaseClass, and making all of the calibration products
@@ -195,6 +237,7 @@ metadata fields will be upper-case.
   \label{tab:metadata}
   Keyword & Inserted & Description \\
   \hline
+  %% CZW: SCHEMA and VERSION duplicate each other.
   \verb|OBSTYPE| & Creation & Calibration dataset type contained in this file. \\
   \verb|{OBSTYPE}_SCHEMA| & Creation & Storage schema for calibration.  \\
   \verb|{OBSTYPE}_VERSION| & Creation & Storage schema version. \\
@@ -207,6 +250,35 @@ metadata fields will be upper-case.
   \verb|CALIBDATE| & Creation & Concatenation of \verb|CALIB_CREATION_DATE| and \verb|CALIB_CREATION_TIME|. \\
   \verb|VALIDSTART| & Certification & Start date the calibration is valid from.  \\
   \verb|VALIDEND| & Certification & End date the calibration is valid from.  \\
+\end{tabular}
+
+\begin{tabular}{l l}
+  Keyword & Description \\
+  \hline
+  %% CZW: detector is an integer.
+  %%      calib_id contents
+  %%      split creation date/time still necessary?
+  %%      validity range is a butler option.
+  \multicolumn{2}{c}{Keywords available as calibration properties.}
+  \verb|OBSTYPE | & Calibration dataset type contained in this file. \\
+  \verb|{OBSTYPE}_VERSION| & Storage schema version, to allow backwards compatibility. \\
+  \verb|INSTRUME| & Instrument/camera this calibration belongs to. \\
+  \verb|RAFTNAME| & Raft containing the detector. \\
+  \verb|SLOTNAME| & Slot in the raft containing the detector. \\
+  \verb|DETECTOR| & Integer identifier for the ccd/detector. \\
+  \verb|DET_NAME| & String identifier for the detector. \\
+  \verb|DET_SER | & Serial number string uniquely identifying the detector device. \\
+  \verb|FILTER  | & Name of the physical filter or ``NONE''. \\
+  \verb|CALIB_ID| & String containing the dataId that is used during ingest. \\
+  \hline
+  \multicolumn{2}{c}{Keywords set at creation time.}
+  \verb|CALIB_CREATION_DATE| & Creation date of the calibration. \\
+  \verb|CALIB_CREATION_TIME| & Creation time of the calibration. \\
+  \hline
+  \multicolumn{2}{c}{Keywords that are set on export from Butler.}
+  \verb|CALIBDATE| & As used, is the validity start date for the calibration. \\
+  \verb|VALIDSTART| & The start date of the validity range for the calibration. \\
+  \verb|VALIDEND| & The end date of the validity range for the calibration. \\
 \end{tabular}
 
 
@@ -224,6 +296,7 @@ inspection is reasonable.  ECSV and YAML are good formats for these
 calibrations, and a calibration's readText/writeText methods should
 implement one of these.
 
+%% CZW: duplicate provenance.
 In addition to the calibration product, the PipelineTask code must
 persist a record of the input data used for construction.  This, along
 with the already persisted pipeline definition and task configuration,
@@ -234,6 +307,7 @@ satisfy this.  Appending additional construction statistics (for
 example, weight factors applied to each input during the combination
 stage) would be helpful in the validation process.
 
+% CZW: Define OIDF = CALIB_ID
 Newly generated calibration products will belong to a Gen3 collection,
 and that collection will be used to manage the calibration through the
 validation and certification process.  This collection may only
@@ -241,6 +315,10 @@ contain one entry for a given OIDF set.
 
 \subsection{Validation}
 
+% CZW: Point to DMTN-101 update
+%      Define ``new data''
+%      input validation, held back validation, new data validation
+%      Metrics TBD/DMTN-101
 Calibration products are not currently validated, largely due to the
 opaque construction process.  Some set of proper validation tasks must
 be made, applying the newly constructed product to a set of test
@@ -250,6 +328,10 @@ the date ranges for which the product is certified.
 
 \subsection{Certification}
 
+% CZW: File format cannot change on registration.
+%      Handling validation ranges.
+%      Header update on export?
+%      Source of truth => gen3.  obs_camera_data => exportability.
 Once a calibration product has been confirmed through validation to
 correct the instrument effect it is designed for, it will be certified
 with a date range denoting when the calibration is valid, and assigned
@@ -293,6 +375,7 @@ operations on the calibration collection that contains them.  This
 will require tools for collection management, but this will be
 entirely Butler database operations and will likely not be calibration
 specific.
+
 
 \section{Conclusion}
 
