@@ -253,7 +253,7 @@ human-readable form to be stored as a curated calibration in the
 \verb|obs_*_data| packages.
 
 The \verb|IsrCalib| is an abstract base class that can be subclassed to implement methods that handle the storage and application of the calibation, as listed in Table \ref{tab:IsrCalib}.
-\begin{tabular}{l l}
+\begin{tabular}{l l l}
   \label{tab:IsrCalib}
   Method & Type & Description \\
   \hline
@@ -291,7 +291,7 @@ upper-case.
   %%      calib_id contents
   %%      split creation date/time still necessary?
   %%      validity range is a butler option.
-  \multicolumn{2}{c}{Keywords available as calibration properties.}
+  \multicolumn{2}{c}{Keywords available as calibration properties.} \\
   \verb|OBSTYPE | & Calibration dataset type contained in this file. \\
   \verb|{OBSTYPE}_VERSION| & Storage schema version, to allow backwards compatibility. \\
   \verb|INSTRUME| & Instrument/camera this calibration belongs to. \\
@@ -300,17 +300,17 @@ upper-case.
   \verb|DETECTOR| & Integer identifier for the detector. \\
   \verb|DET_NAME| & String identifier for the detector. \\
   \hline
-  \multicolumn{2}{c}{Keywords set at creation time.}
+  \multicolumn{2}{c}{Keywords set at creation time.} \\
   \verb|CALIB_CREATION_DATE| & Creation date of the calibration. \\
   \verb|CALIB_CREATION_TIME| & Creation time of the calibration. \\
   \hline
-  \multicolumn{2}{c}{Keywords set at creation time from all used inputs.}
+  \multicolumn{2}{c}{Keywords set at creation time from all used inputs.} \\
   \verb|CPP_INPUT_N| & Input exposure number. \\
   \verb|CPP_INPUT_DATE_N| & Input observation date. \\
   \verb|CPP_INPUT_EXPT_N| & Input exposure time. \\
   \verb|CPP_INPUT_SCALE_N| & Input scale factor used in combination. \\
   \hline
-  \multicolumn{2}{c}{Keywords that are set on export from Butler.}
+  \multicolumn{2}{c}{Keywords that are set on export from Butler.} \\
   \verb|CALIBDATE| & As used, is the validity start date for the calibration. \\
   \verb|VALIDSTART| & The start date of the validity range for the calibration. \\
   \verb|VALIDEND| & The end date of the validity range for the calibration. \\
