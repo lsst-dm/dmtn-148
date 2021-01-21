@@ -61,3 +61,16 @@ To update to a newer version of `lsst-texmf`_, you can update the submodule in t
 Commit, then push, the updated submodule.
 
 .. _lsst-texmf: https://github.com/lsst/lsst-texmf
+
+
+The GitHub Actions workflow file.
+---------------------------------
+
+**Tip:** GitHub Actions provides a flexible Python environment.
+It's likely easier to run preprocessing scripts directly from the GitHub actions environment, rather than within the lsst-texmf Docker container:
+
+Install additional Python dependencies in the `Python install` step.
+- Add additional bash commands for preprocessing steps to run before the `docker run` step.
+- Structure your `Makefile` so that files built in advance in the GitHub actions environment are automatically used as-is by the `docker run` command.
+
+For more information about using the CI environment, see the [GitHub actions workflow documentation](https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions).
